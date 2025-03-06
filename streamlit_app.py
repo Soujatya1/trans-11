@@ -122,8 +122,30 @@ def main():
         doc = Document(uploaded_file)
         
         language_options = {
-            "Bengali": "bn", "Hindi": "hi", "Odia": "or", "Punjabi": "pa", 
-            "Tamil": "ta", "Telugu": "te", "Gujarati": "gu", "Malayalam": "ml"
+            "English": "en",
+            "Auto-detect": "",
+            "Kashmiri": "ks",
+            "Nepali": "ne",
+            "Bengali": "bn",
+            "Marathi": "mr",
+            "Sindhi": "sd",
+            "Telugu": "te",
+            "Gujarati": "gu",
+            "Gom": "gom",
+            "Urdu": "ur",
+            "Santali": "sat",
+            "Kannada": "kn",
+            "Malayalam": "ml",
+            "Manipuri": "mni",
+            "Tamil": "ta",
+            "Hindi": "hi",
+            "Punjabi": "pa",
+            "Odia": "or",
+            "Dogri": "doi",
+            "Assamese": "as",
+            "Sanskrit": "sa",
+            "Bodo": "brx",
+            "Maithili": "mai"
         }
         
         source_language = st.selectbox("Select Source Language", options=["English", "Auto-detect"], index=0)
