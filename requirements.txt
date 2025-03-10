@@ -1,3 +1,4 @@
 streamlit
 deep-translator
 python-docx
+langdetect
