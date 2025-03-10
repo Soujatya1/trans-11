@@ -5,6 +5,7 @@ from docx.shared import Pt
 from deep_translator import GoogleTranslator
 import concurrent.futures
 import requests
+from langdetect import detect
 
 def translate_text(text, source_language, target_language):
     api_url = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline/"
@@ -146,7 +147,7 @@ def main():
             "Maithili": "mai"
         }
         
-        source_language = st.selectbox("Select Source Language", options=["English", "Auto-detect"], index=0)
+        source_language = st.selectbox("Select Source Language", options=["Auto-detect"], index=0)
         source_code = "en" if source_language == "English" else "auto"
         
         target_language = st.selectbox("Select Target Language", options=list(language_options.keys()))
@@ -154,6 +155,23 @@ def main():
         
         if st.button("Translate Document"):
             with st.spinner('Translating...'):
+                if source_language == "Auto-detect":
+                    sample_text = ""
+                    for p in doc.paragraphs:
+                        if p.text.strip():
+                            sample_text = p.text.strip()
+                            break
+                    if sample_text:
+                        try:
+                            detected_lang = detect(sample_text)
+                            source_code = detected_lang
+                        except:
+                            st.warning("Could not detect language. Using English as source.")
+                            source_code = "en"
+                    else:
+                        source_code = "en"
+                else:
+                    source_code = "en"
                 translated_doc = translate_doc(doc, source_code, language_code)
                 
                 with open("translated_document.docx", "wb") as f:
