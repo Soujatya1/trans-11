@@ -156,22 +156,41 @@ def main():
         if st.button("Translate Document"):
             with st.spinner('Translating...'):
                 if source_language == "Auto-detect":
-                    sample_text = ""
+                    language_counts = {}
+            
+            # Check all paragraphs for language detection
                     for p in doc.paragraphs:
                         if p.text.strip():
-                            sample_text = p.text.strip()
-                            break
-                    if sample_text:
-                        try:
-                            detected_lang = detect(sample_text)
-                            source_code = detected_lang
-                        except:
-                            st.warning("Could not detect language. Using English as source.")
-                            source_code = "en"
+                            try:
+                                detected_lang = detect(p.text.strip())
+                                if detected_lang in language_counts:
+                                    language_counts[detected_lang] += 1
+                                else:
+                                    language_counts[detected_lang] = 1
+                            except:
+                                pass
+            
+                    for table in doc.tables:
+                        for row in table.rows:
+                            for cell in row.cells:
+                                if cell.text.strip():
+                                    try:
+                                        detected_lang = detect(cell.text.strip())
+                                        if detected_lang in language_counts:
+                                            language_counts[detected_lang] += 1
+                                        else:
+                                            language_counts[detected_lang] = 1
+                                    except:
+                                        pass
+                    if language_counts:
+                        source_code = max(language_counts, key=language_counts.get)
+                        st.info(f"Multiple languages detected. Using most common language: {source_code}")
                     else:
+                        st.warning("Could not detect any language. Using English as source.")
                         source_code = "en"
                 else:
                     source_code = "en"
+        
                 translated_doc = translate_doc(doc, source_code, language_code)
                 
                 with open("translated_document.docx", "wb") as f:
