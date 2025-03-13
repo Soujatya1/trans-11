@@ -88,35 +88,55 @@ def translate_text(text, source_language, target_language):
     except Exception as e:
         return text
 
-def translate_doc(doc, source='en', destination='hi'):
+def detect_language(text):
+    """Detect language of a text snippet"""
+    try:
+        if text and text.strip():
+            return detect(text.strip())
+        return "en"  # Default to English if text is empty
+    except Exception as e:
+        print(f"Error detecting language: {e}")
+        return "en"  # Default to English on error
+
+def translate_doc(doc, target_language='hi'):
+    """Translate document with per-run language detection"""
+    # Process paragraphs
     for p in doc.paragraphs:
-        if p.text.strip():
-            try:
-                for run in p.runs:
-                    if run.text.strip():
-                        original_text = run.text.strip()
-                        translated_text = translate_text(original_text, source, destination) or original_text
-                        run.text = translated_text
-            except Exception as e:
-                print(f"Error translating paragraph: {e}")
+        for run in p.runs:
+            if run.text.strip():
+                original_text = run.text.strip()
+                source_lang = detect_language(original_text)
+                # Only translate if we have content and detected language is not the target
+                if original_text and source_lang != target_language:
+                    try:
+                        translated_text = translate_text(original_text, source_lang, target_language)
+                        if translated_text:
+                            run.text = translated_text
+                    except Exception as e:
+                        print(f"Error translating run: {e}")
    
+    # Process tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                if cell.text.strip():
-                    try:
-                        for para in cell.paragraphs:
-                            for run in para.runs:
-                                if run.text.strip():
-                                    original_text = run.text.strip()
-                                    translated_text = translate_text(original_text, source, destination) or original_text
-                                    run.text = translated_text
-                    except Exception as e:
-                        print(f"Error translating cell text: {e}")
+                for para in cell.paragraphs:
+                    for run in para.runs:
+                        if run.text.strip():
+                            original_text = run.text.strip()
+                            source_lang = detect_language(original_text)
+                            # Only translate if we have content and detected language is not the target
+                            if original_text and source_lang != target_language:
+                                try:
+                                    translated_text = translate_text(original_text, source_lang, target_language)
+                                    if translated_text:
+                                        run.text = translated_text
+                                except Exception as e:
+                                    print(f"Error translating cell run: {e}")
     return doc
     
 def main():
-    st.title("Word Document Translator")
+    st.title("Multilingual Document Translator")
+    st.write("This app detects and translates text in multiple languages within the same document.")
     
     uploaded_file = st.file_uploader("Upload a Word Document", type=["docx"])
     if uploaded_file:
@@ -147,51 +167,58 @@ def main():
             "Maithili": "mai"
         }
         
-        source_language = st.selectbox("Select Source Language", options=["Auto-detect"], index=0)
-        source_code = "en" if source_language == "English" else "auto"
-        
+        # We don't need source language selection anymore since we detect per run
         target_language = st.selectbox("Select Target Language", options=list(language_options.keys()))
         language_code = language_options[target_language]
         
+        # Option to show detected languages
+        show_detected = st.checkbox("Show detected languages in document", value=True)
+        
         if st.button("Translate Document"):
-            with st.spinner('Translating...'):
-                if source_language == "Auto-detect":
-                    language_counts = {}
-            
-            # Check all paragraphs for language detection
+            with st.spinner('Analyzing and translating document...'):
+                # First, scan the document to show language statistics if requested
+                if show_detected:
+                    languages_detected = {}
+                    
+                    # Check languages in paragraphs
                     for p in doc.paragraphs:
-                        if p.text.strip():
-                            try:
-                                detected_lang = detect(p.text.strip())
-                                if detected_lang in language_counts:
-                                    language_counts[detected_lang] += 1
-                                else:
-                                    language_counts[detected_lang] = 1
-                            except:
-                                pass
-            
+                        for run in p.runs:
+                            if run.text.strip():
+                                try:
+                                    detected_lang = detect_language(run.text.strip())
+                                    if detected_lang in languages_detected:
+                                        languages_detected[detected_lang] += 1
+                                    else:
+                                        languages_detected[detected_lang] = 1
+                                except:
+                                    pass
+                    
+                    # Check languages in tables
                     for table in doc.tables:
                         for row in table.rows:
                             for cell in row.cells:
-                                if cell.text.strip():
-                                    try:
-                                        detected_lang = detect(cell.text.strip())
-                                        if detected_lang in language_counts:
-                                            language_counts[detected_lang] += 1
-                                        else:
-                                            language_counts[detected_lang] = 1
-                                    except:
-                                        pass
-                    if language_counts:
-                        source_code = max(language_counts, key=language_counts.get)
-                        st.info(f"Multiple languages detected. Using most common language: {source_code}")
+                                for para in cell.paragraphs:
+                                    for run in para.runs:
+                                        if run.text.strip():
+                                            try:
+                                                detected_lang = detect_language(run.text.strip())
+                                                if detected_lang in languages_detected:
+                                                    languages_detected[detected_lang] += 1
+                                                else:
+                                                    languages_detected[detected_lang] = 1
+                                            except:
+                                                pass
+                    
+                    # Display language statistics
+                    if languages_detected:
+                        st.info("Languages detected in document:")
+                        for lang, count in languages_detected.items():
+                            st.write(f"- {lang}: {count} text segments")
                     else:
-                        st.warning("Could not detect any language. Using English as source.")
-                        source_code = "en"
-                else:
-                    source_code = "en"
-        
-                translated_doc = translate_doc(doc, source_code, language_code)
+                        st.warning("Could not detect any language. Will use English as default source.")
+                
+                # Now perform the translation
+                translated_doc = translate_doc(doc, language_code)
                 
                 with open("translated_document.docx", "wb") as f:
                     translated_doc.save(f)
