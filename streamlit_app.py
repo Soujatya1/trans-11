@@ -116,24 +116,28 @@ def translate_text(text, source_language, target_language):
             else:
                 return text
 
-def detect_language(text):
-    """Detect language of a text snippet with fallback to English"""
+def detect_language(text, valid_languages):
+    """Detect language of a text snippet, limiting to valid languages with fallback to English"""
     if not text or not text.strip():
         return "en"
-        
+    
     try:
-        return detect(text.strip())
+        detected = detect(text.strip())
+        # Only return the detected language if it's in our valid languages list
+        if detected in valid_languages:
+            return detected
+        return "en"  # Default to English if detected language is not in our supported list
     except Exception as e:
         print(f"Error detecting language: {e}")
         return "en"  # Default to English on error
 
-def translate_paragraph_text(paragraph, target_language):
+def translate_paragraph_text(paragraph, target_language, valid_languages):
     """Translate an entire paragraph as a unit if run-by-run translation might miss context"""
     if not paragraph.text.strip():
         return
         
     # First attempt: try to translate the whole paragraph
-    source_lang = detect_language(paragraph.text)
+    source_lang = detect_language(paragraph.text, valid_languages)
     if source_lang == target_language:
         return  # No need to translate if already in target language
         
@@ -150,8 +154,11 @@ def translate_paragraph_text(paragraph, target_language):
         print(f"Error in paragraph translation: {e}")
         return False
         
-def translate_doc(doc, target_language='hi'):
+def translate_doc(doc, target_language='hi', valid_languages=None):
     """Translate document with multiple fallback methods"""
+    if valid_languages is None:
+        valid_languages = ["en", "hi"]  # Default fallback
+        
     # Keep track of translation statistics
     stats = {
         "runs_processed": 0,
@@ -167,7 +174,7 @@ def translate_doc(doc, target_language='hi'):
             stats["paragraphs_processed"] += 1
             # Only do paragraph translation if it has multiple runs or complex structure
             if len(p.runs) > 1:
-                if translate_paragraph_text(p, target_language):
+                if translate_paragraph_text(p, target_language, valid_languages):
                     stats["successful_translations"] += 1
                     continue  # Skip run-level translation if paragraph translation succeeded
             
@@ -177,7 +184,7 @@ def translate_doc(doc, target_language='hi'):
                     stats["runs_processed"] += 1
                     try:
                         original_text = run.text
-                        source_lang = detect_language(original_text)
+                        source_lang = detect_language(original_text, valid_languages)
                         
                         # Skip translation if already in target language
                         if source_lang == target_language:
@@ -202,7 +209,7 @@ def translate_doc(doc, target_language='hi'):
                     
                     # Try paragraph-level translation first for better context
                     if len(para.runs) > 1:
-                        if translate_paragraph_text(para, target_language):
+                        if translate_paragraph_text(para, target_language, valid_languages):
                             stats["successful_translations"] += 1
                             continue  # Skip run-level if paragraph translation succeeded
                     
@@ -212,7 +219,7 @@ def translate_doc(doc, target_language='hi'):
                             stats["runs_processed"] += 1
                             try:
                                 original_text = run.text
-                                source_lang = detect_language(original_text)
+                                source_lang = detect_language(original_text, valid_languages)
                                 
                                 # Skip translation if already in target language
                                 if source_lang == target_language:
@@ -263,6 +270,11 @@ def main():
             "Maithili": "mai"
         }
         
+        # Get all language codes from our options dictionary
+        valid_language_codes = list(language_options.values())
+        # Add English as it's our default fallback
+        valid_language_codes.append("en")
+        
         target_language = st.selectbox("Select Target Language", options=list(language_options.keys()))
         language_code = language_options[target_language]
         
@@ -286,7 +298,7 @@ def main():
                 for p in doc.paragraphs:
                     if p.text.strip():
                         try:
-                            detected_lang = detect_language(p.text.strip())
+                            detected_lang = detect_language(p.text.strip(), valid_language_codes)
                             if detected_lang in languages_detected:
                                 languages_detected[detected_lang] += 1
                             else:
@@ -300,7 +312,7 @@ def main():
                         for cell in row.cells:
                             if cell.text.strip():
                                 try:
-                                    detected_lang = detect_language(cell.text.strip())
+                                    detected_lang = detect_language(cell.text.strip(), valid_language_codes)
                                     if detected_lang in languages_detected:
                                         languages_detected[detected_lang] += 1
                                     else:
@@ -322,7 +334,7 @@ def main():
             status_text.text("Translating document... This may take several minutes for large documents.")
             progress_bar.progress(40)
             
-            translated_doc, stats = translate_doc(doc, language_code)
+            translated_doc, stats = translate_doc(doc, language_code, valid_language_codes)
             
             progress_bar.progress(90)
             status_text.text("Saving translated document...")
