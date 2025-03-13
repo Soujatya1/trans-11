@@ -8,9 +8,11 @@ from langdetect import detect
 import time
 
 def translate_text(text, source_language, target_language):
+    """Translate text using ULCA API with retry mechanism"""
     if not text or not text.strip():
         return text
         
+    # Don't translate if source and target are the same
     if source_language == target_language:
         return text
         
@@ -42,6 +44,7 @@ def translate_text(text, source_language, target_language):
         }
     }
     
+    # Implement retry logic
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -52,13 +55,13 @@ def translate_text(text, source_language, target_language):
                 break
             else:
                 if attempt < max_retries - 1:
-                    time.sleep(1)
+                    time.sleep(1)  # Wait before retrying
                     continue
                 else:
                     return text
         except Exception as e:
             if attempt < max_retries - 1:
-                time.sleep(1)
+                time.sleep(1)  # Wait before retrying
                 continue
             else:
                 return text
@@ -92,6 +95,7 @@ def translate_text(text, source_language, target_language):
         response_data["pipelineInferenceAPIEndPoint"]["inferenceApiKey"]["value"]
     }
     
+    # Implement retry logic for translation call
     for attempt in range(max_retries):
         try:
             compute_response = requests.post(callback_url, json=compute_payload, headers=headers2, timeout=15)
@@ -101,13 +105,13 @@ def translate_text(text, source_language, target_language):
                 return translated_content
             else:
                 if attempt < max_retries - 1:
-                    time.sleep(1)
+                    time.sleep(1)  # Wait before retrying
                     continue
                 else:
                     return text
         except Exception as e:
             if attempt < max_retries - 1:
-                time.sleep(1)
+                time.sleep(1)  # Wait before retrying
                 continue
             else:
                 return text
@@ -119,27 +123,31 @@ def detect_language(text, valid_languages):
     
     try:
         detected = detect(text.strip())
+        # Only return the detected language if it's in our valid languages list
         if detected in valid_languages:
             return detected
-        return "en"
+        return "en"  # Default to English if detected language is not in our supported list
     except Exception as e:
         print(f"Error detecting language: {e}")
-        return "en"
+        return "en"  # Default to English on error
 
 def translate_paragraph_text(paragraph, target_language, valid_languages):
     """Translate an entire paragraph as a unit if run-by-run translation might miss context"""
     if not paragraph.text.strip():
         return
         
+    # First attempt: try to translate the whole paragraph
     source_lang = detect_language(paragraph.text, valid_languages)
     if source_lang == target_language:
-        return
+        return  # No need to translate if already in target language
         
     try:
         full_translation = translate_text(paragraph.text, source_lang, target_language)
         if full_translation and full_translation != paragraph.text:
+            # Clear existing runs
             for run in paragraph.runs:
                 run.text = ""
+            # Add translation as a new run
             new_run = paragraph.add_run(full_translation)
             return True
     except Exception as e:
@@ -149,8 +157,9 @@ def translate_paragraph_text(paragraph, target_language, valid_languages):
 def translate_doc(doc, target_language='hi', valid_languages=None):
     """Translate document with multiple fallback methods"""
     if valid_languages is None:
-        valid_languages = ["en", "hi"]
+        valid_languages = ["en", "hi"]  # Default fallback
         
+    # Keep track of translation statistics
     stats = {
         "runs_processed": 0,
         "paragraphs_processed": 0,
@@ -159,14 +168,17 @@ def translate_doc(doc, target_language='hi', valid_languages=None):
         "failed_translations": 0
     }
     
+    # First pass: Try to translate each paragraph as a whole unit for better context
     for p in doc.paragraphs:
         if p.text.strip():
             stats["paragraphs_processed"] += 1
+            # Only do paragraph translation if it has multiple runs or complex structure
             if len(p.runs) > 1:
                 if translate_paragraph_text(p, target_language, valid_languages):
                     stats["successful_translations"] += 1
-                    continue
+                    continue  # Skip run-level translation if paragraph translation succeeded
             
+            # Second approach: translate run by run
             for run in p.runs:
                 if run.text.strip():
                     stats["runs_processed"] += 1
@@ -174,6 +186,7 @@ def translate_doc(doc, target_language='hi', valid_languages=None):
                         original_text = run.text
                         source_lang = detect_language(original_text, valid_languages)
                         
+                        # Skip translation if already in target language
                         if source_lang == target_language:
                             continue
                             
@@ -187,17 +200,20 @@ def translate_doc(doc, target_language='hi', valid_languages=None):
                         print(f"Error translating run: {e}")
                         stats["failed_translations"] += 1
    
+    # Process tables with the same dual approach
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for para in cell.paragraphs:
                     stats["paragraphs_processed"] += 1
                     
+                    # Try paragraph-level translation first for better context
                     if len(para.runs) > 1:
                         if translate_paragraph_text(para, target_language, valid_languages):
                             stats["successful_translations"] += 1
-                            continue
+                            continue  # Skip run-level if paragraph translation succeeded
                     
+                    # Fall back to run-by-run translation
                     for run in para.runs:
                         if run.text.strip():
                             stats["runs_processed"] += 1
@@ -205,6 +221,7 @@ def translate_doc(doc, target_language='hi', valid_languages=None):
                                 original_text = run.text
                                 source_lang = detect_language(original_text, valid_languages)
                                 
+                                # Skip translation if already in target language
                                 if source_lang == target_language:
                                     continue
                                     
@@ -253,12 +270,15 @@ def main():
             "Maithili": "mai"
         }
         
+        # Get all language codes from our options dictionary
         valid_language_codes = list(language_options.values())
+        # Add English as it's our default fallback
         valid_language_codes.append("en")
         
         target_language = st.selectbox("Select Target Language", options=list(language_options.keys()))
         language_code = language_options[target_language]
         
+        # Advanced options
         with st.expander("Advanced Options"):
             show_detected = st.checkbox("Show detected languages in document", value=True)
             show_stats = st.checkbox("Show translation statistics", value=True)
@@ -267,12 +287,14 @@ def main():
             progress_bar = st.progress(0)
             status_text = st.empty()
             
+            # First scan document to show language statistics if requested
             if show_detected:
                 status_text.text("Analyzing document languages...")
                 progress_bar.progress(10)
                 
                 languages_detected = {}
                 
+                # Check languages in paragraphs
                 for p in doc.paragraphs:
                     if p.text.strip():
                         try:
@@ -284,6 +306,7 @@ def main():
                         except:
                             pass
                 
+                # Check languages in tables
                 for table in doc.tables:
                     for row in table.rows:
                         for cell in row.cells:
@@ -299,6 +322,7 @@ def main():
                 
                 progress_bar.progress(30)
                 
+                # Display language statistics
                 if languages_detected:
                     st.info("Languages detected in document:")
                     for lang, count in sorted(languages_detected.items(), key=lambda x: x[1], reverse=True):
@@ -306,6 +330,7 @@ def main():
                 else:
                     st.warning("Could not detect any language. Will use English as default source.")
             
+            # Now perform the translation
             status_text.text("Translating document... This may take several minutes for large documents.")
             progress_bar.progress(40)
             
@@ -319,6 +344,7 @@ def main():
             
             progress_bar.progress(100)
             
+            # Show translation statistics if requested
             if show_stats:
                 st.subheader("Translation Statistics")
                 st.write(f"- Paragraphs processed: {stats['paragraphs_processed']}")
