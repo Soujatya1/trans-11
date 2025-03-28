@@ -226,6 +226,7 @@ def main():
         doc = Document(uploaded_file)
         
         language_options = {
+            "English": "en",
             "Kashmiri": "ks",
             "Nepali": "ne",
             "Bengali": "bn",
