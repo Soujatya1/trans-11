@@ -155,8 +155,13 @@ def translate_paragraph_text(paragraph, target_language, valid_languages):
         return False
         
 def translate_doc(doc, target_language='hi', valid_languages=None):
+    # Default valid languages now include all languages from language_options
     if valid_languages is None:
-        valid_languages = ["en", "hi"]
+        valid_languages = [
+            "en", "ks", "ne", "bn", "mr", "sd", "te", "gu", "gom", "ur",
+            "sat", "kn", "ml", "mni", "ta", "hi", "pa", "or", "doi", 
+            "as", "sa", "brx", "mai"
+        ]
         
     stats = {
         "runs_processed": 0,
@@ -225,12 +230,12 @@ def translate_doc(doc, target_language='hi', valid_languages=None):
                                     stats["successful_translations"] += 1
                                 else:
                                     # Highlight failed translations in yellow
-                                    run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+                                    run.font.highlight_color = WD_COLOR_INDEX.RED
                                     stats["failed_translations"] += 1
                             except Exception as e:
                                 print(f"Error translating cell run: {e}")
                                 # Highlight errors in yellow as well
-                                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+                                run.font.highlight_color = WD_COLOR_INDEX.RED
                                 stats["failed_translations"] += 1
                                 
     return doc, stats
