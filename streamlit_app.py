@@ -6,6 +6,8 @@ import concurrent.futures
 import requests
 from langdetect import detect
 import time
+from docx.shared import RGBColor
+from docx.enum.text import WD_COLOR_INDEX
 
 def translate_text(text, source_language, target_language):
     if not text or not text.strip():
@@ -140,8 +142,16 @@ def translate_paragraph_text(paragraph, target_language, valid_languages):
                 run.text = ""
             new_run = paragraph.add_run(full_translation)
             return True
+        else:
+            # Highlight all runs in the paragraph if translation fails
+            for run in paragraph.runs:
+                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+            return False
     except Exception as e:
         print(f"Error in paragraph translation: {e}")
+        # Highlight all runs in the paragraph on error
+        for run in paragraph.runs:
+            run.font.highlight_color = WD_COLOR_INDEX.YELLOW
         return False
         
 def translate_doc(doc, target_language='hi', valid_languages=None):
@@ -179,9 +189,13 @@ def translate_doc(doc, target_language='hi', valid_languages=None):
                             run.text = translated_text
                             stats["successful_translations"] += 1
                         else:
+                            # Highlight failed translations in yellow
+                            run.font.highlight_color = WD_COLOR_INDEX.YELLOW
                             stats["failed_translations"] += 1
                     except Exception as e:
                         print(f"Error translating run: {e}")
+                        # Highlight errors in yellow as well
+                        run.font.highlight_color = WD_COLOR_INDEX.YELLOW
                         stats["failed_translations"] += 1
    
     for table in doc.tables:
@@ -210,9 +224,13 @@ def translate_doc(doc, target_language='hi', valid_languages=None):
                                     run.text = translated_text
                                     stats["successful_translations"] += 1
                                 else:
+                                    # Highlight failed translations in yellow
+                                    run.font.highlight_color = WD_COLOR_INDEX.YELLOW
                                     stats["failed_translations"] += 1
                             except Exception as e:
                                 print(f"Error translating cell run: {e}")
+                                # Highlight errors in yellow as well
+                                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
                                 stats["failed_translations"] += 1
                                 
     return doc, stats
