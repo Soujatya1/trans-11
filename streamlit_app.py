@@ -327,7 +327,7 @@ def main():
                 success_rate = 0
                 if stats['runs_processed'] > 0:
                     success_rate = (stats['successful_translations'] / stats['runs_processed']) * 100
-                st.write(f"- Success rate: {success_rate:.1f}%")
+                #st.write(f"- Success rate: {success_rate:.1f}%")
             
             with open("translated_document.docx", "rb") as f:
                 st.download_button(
