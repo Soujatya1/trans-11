@@ -319,9 +319,9 @@ def main():
             
             if show_stats:
                 st.subheader("Translation Statistics")
-                st.write(f"- Paragraphs processed: {stats['paragraphs_processed']}")
-                st.write(f"- Runs processed: {stats['runs_processed']}")
-                st.write(f"- Successful translations: {stats['successful_translations']}")
+                #st.write(f"- Paragraphs processed: {stats['paragraphs_processed']}")
+                #st.write(f"- Runs processed: {stats['runs_processed']}")
+                #st.write(f"- Successful translations: {stats['successful_translations']}")
                 st.write(f"- Failed translations: {stats['failed_translations']}")
                 
                 success_rate = 0
