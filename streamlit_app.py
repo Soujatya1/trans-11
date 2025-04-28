@@ -14,6 +14,16 @@ from logging.handlers import RotatingFileHandler
 import traceback
 from datetime import datetime
 
+def list_log_files(log_directory="logs"):
+    """List all log files in the specified directory"""
+    if not os.path.exists(log_directory):
+        return []
+    
+    log_files = [f for f in os.listdir(log_directory) if f.endswith('.log')]
+    # Sort by modification time, newest first
+    log_files.sort(key=lambda x: os.path.getmtime(os.path.join(log_directory, x)), reverse=True)
+    return log_files
+
 def setup_logging(log_directory="logs", log_level=logging.INFO):
     os.makedirs(log_directory, exist_ok=True)
     logger = logging.getLogger('document_translator')
@@ -483,6 +493,42 @@ def main():
                 logger.error(f"Error preparing download button: {str(e)}")
                 logger.debug(traceback.format_exc())
                 st.error(f"Error preparing download: {str(e)}")
+
+    with st.expander("Log Files"):
+    st.subheader("Download Log Files")
+    log_files = list_log_files()
+    
+    if not log_files:
+        st.info("No log files available.")
+    else:
+        selected_log = st.selectbox("Select Log File", options=log_files)
+        
+        if selected_log:
+            log_path = os.path.join("logs", selected_log)
+            try:
+                with open(log_path, "rb") as f:
+                    log_content = f.read()
+                
+                st.download_button(
+                    label="Download Log File",
+                    data=log_content,
+                    file_name=selected_log,
+                    mime="text/plain"
+                )
+                
+                # Optional: Show log preview
+                with st.expander("Log Preview"):
+                    try:
+                        # Read the last 50 lines for preview
+                        with open(log_path, "r") as f:
+                            lines = f.readlines()
+                            preview = "".join(lines[-50:])  # Last 50 lines
+                            st.text_area("Log Content (last 50 lines)", preview, height=300)
+                    except Exception as e:
+                        st.error(f"Error reading log file: {str(e)}")
+                        
+            except Exception as e:
+                st.error(f"Error preparing log file for download: {str(e)}")
 
 if __name__ == '__main__':
     try:
