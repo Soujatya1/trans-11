@@ -143,19 +143,16 @@ def translate_paragraph_text(paragraph, target_language, valid_languages):
             new_run = paragraph.add_run(full_translation)
             return True
         else:
-            # Highlight all runs in the paragraph if translation fails
             for run in paragraph.runs:
                 run.font.highlight_color = WD_COLOR_INDEX.RED
             return False
     except Exception as e:
         print(f"Error in paragraph translation: {e}")
-        # Highlight all runs in the paragraph on error
         for run in paragraph.runs:
             run.font.highlight_color = WD_COLOR_INDEX.RED
         return False
         
-def translate_doc(doc, target_language='hi', valid_languages=None):
-    # Default valid languages now include all languages from language_options
+def translate_doc(doc, target_language, valid_languages=None):
     if valid_languages is None:
         valid_languages = [
             "en", "ks", "ne", "bn", "mr", "sd", "te", "gu", "gom", "ur",
