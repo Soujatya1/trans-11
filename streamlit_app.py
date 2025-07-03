@@ -17,8 +17,8 @@ def translate_text(text, source_language, target_language):
         return text
         
     api_url = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline/"
-    user_id = "bb9aefab0bb64f728e49a398ecc14eec"
-    ulca_api_key = "1160f0d27c-f569-4bf8-b602-fd92986c056f "
+    user_id = "00fe73dcb98f43f39c1c308616856405"
+    ulca_api_key = "426d392042-9028-4f13-aea7-ad172f8048f8"
     
     headers = {
         "Content-Type": "application/json",
