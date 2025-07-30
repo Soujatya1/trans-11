@@ -11,7 +11,7 @@ from docx.enum.text import WD_COLOR_INDEX
 import re
 
 def add_context(text, source_language, target_language):
-    if source_language == source_language and target_language == target_language:
+    if source_language == source_lang and target_language == target_language:
         patterns = {
             r"Reply to your notice": "Response to your notice",
             r"Reply to the notice": "Response to the notice", 
