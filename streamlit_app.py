@@ -8,6 +8,21 @@ from langdetect import detect
 import time
 from docx.shared import RGBColor
 from docx.enum.text import WD_COLOR_INDEX
+import re
+
+def split_into_sentences(text):
+    """Split text into sentences using regex patterns"""
+    if not text or not text.strip():
+        return []
+    
+    # Basic sentence splitting pattern - handles common sentence endings
+    sentence_pattern = r'(?<=[.!?])\s+(?=[A-Z])'
+    sentences = re.split(sentence_pattern, text.strip())
+    
+    # Clean up sentences and filter out empty ones
+    sentences = [s.strip() for s in sentences if s.strip()]
+    
+    return sentences
 
 def translate_text(text, source_language, target_language):
     if not text or not text.strip():
@@ -127,30 +142,104 @@ def detect_language(text, valid_languages):
         print(f"Error detecting language: {e}")
         return "en"
 
-def translate_paragraph_text(paragraph, target_language, valid_languages):
+def translate_paragraph_sentences(paragraph, target_language, valid_languages):
+    """Translate a paragraph at sentence level"""
     if not paragraph.text.strip():
-        return
-        
-    source_lang = detect_language(paragraph.text, valid_languages)
-    if source_lang == target_language:
-        return
-        
-    try:
-        full_translation = translate_text(paragraph.text, source_lang, target_language)
-        if full_translation and full_translation != paragraph.text:
-            for run in paragraph.runs:
-                run.text = ""
-            new_run = paragraph.add_run(full_translation)
-            return True
-        else:
-            for run in paragraph.runs:
-                run.font.highlight_color = WD_COLOR_INDEX.RED
-            return False
-    except Exception as e:
-        print(f"Error in paragraph translation: {e}")
-        for run in paragraph.runs:
-            run.font.highlight_color = WD_COLOR_INDEX.RED
         return False
+    
+    # Split paragraph into sentences
+    sentences = split_into_sentences(paragraph.text)
+    if not sentences:
+        return False
+    
+    translated_sentences = []
+    translation_success = True
+    
+    for sentence in sentences:
+        if not sentence.strip():
+            translated_sentences.append(sentence)
+            continue
+            
+        try:
+            source_lang = detect_language(sentence, valid_languages)
+            if source_lang == target_language:
+                translated_sentences.append(sentence)
+                continue
+                
+            translated_sentence = translate_text(sentence, source_lang, target_language)
+            if translated_sentence and translated_sentence != sentence:
+                translated_sentences.append(translated_sentence)
+            else:
+                translated_sentences.append(sentence)
+                translation_success = False
+                
+        except Exception as e:
+            print(f"Error translating sentence: {e}")
+            translated_sentences.append(sentence)
+            translation_success = False
+    
+    # Replace paragraph content with translated sentences
+    if translated_sentences:
+        # Clear existing runs
+        for run in paragraph.runs:
+            run.text = ""
+        
+        # Add translated content as a single run
+        combined_text = " ".join(translated_sentences)
+        new_run = paragraph.add_run(combined_text)
+        
+        # Highlight if any sentence failed translation
+        if not translation_success:
+            new_run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+            
+        return translation_success
+    
+    return False
+
+def translate_run_sentences(run, target_language, valid_languages):
+    """Translate a run at sentence level"""
+    if not run.text.strip():
+        return True
+    
+    sentences = split_into_sentences(run.text)
+    if not sentences:
+        return True
+    
+    translated_sentences = []
+    translation_success = True
+    
+    for sentence in sentences:
+        if not sentence.strip():
+            translated_sentences.append(sentence)
+            continue
+            
+        try:
+            source_lang = detect_language(sentence, valid_languages)
+            if source_lang == target_language:
+                translated_sentences.append(sentence)
+                continue
+                
+            translated_sentence = translate_text(sentence, source_lang, target_language)
+            if translated_sentence and translated_sentence != sentence:
+                translated_sentences.append(translated_sentence)
+            else:
+                translated_sentences.append(sentence)
+                translation_success = False
+                
+        except Exception as e:
+            print(f"Error translating sentence in run: {e}")
+            translated_sentences.append(sentence)
+            translation_success = False
+    
+    # Replace run content with translated sentences
+    if translated_sentences:
+        run.text = " ".join(translated_sentences)
+        
+        # Highlight if any sentence failed translation
+        if not translation_success:
+            run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+            
+    return translation_success
         
 def translate_doc(doc, target_language, valid_languages=None):
     if valid_languages is None:
@@ -161,81 +250,70 @@ def translate_doc(doc, target_language, valid_languages=None):
         ]
         
     stats = {
-        "runs_processed": 0,
+        "sentences_processed": 0,
         "paragraphs_processed": 0,
         "successful_translations": 0,
-        "fallback_translations": 0,
         "failed_translations": 0
     }
     
+    # Process paragraphs
     for p in doc.paragraphs:
         if p.text.strip():
             stats["paragraphs_processed"] += 1
-            if len(p.runs) > 1:
-                if translate_paragraph_text(p, target_language, valid_languages):
-                    stats["successful_translations"] += 1
-                    continue
             
-            for run in p.runs:
-                if run.text.strip():
-                    stats["runs_processed"] += 1
-                    try:
-                        original_text = run.text
-                        source_lang = detect_language(original_text, valid_languages)
-                        
-                        if source_lang == target_language:
-                            continue
-                            
-                        translated_text = translate_text(original_text, source_lang, target_language)
-                        if translated_text and translated_text != original_text:
-                            run.text = translated_text
-                            stats["successful_translations"] += 1
+            # Count sentences in this paragraph
+            sentences = split_into_sentences(p.text)
+            stats["sentences_processed"] += len(sentences)
+            
+            if len(p.runs) > 1:
+                # Handle multi-run paragraphs at sentence level
+                success = translate_paragraph_sentences(p, target_language, valid_languages)
+                if success:
+                    stats["successful_translations"] += len(sentences)
+                else:
+                    stats["failed_translations"] += len(sentences)
+            else:
+                # Handle single run paragraphs
+                for run in p.runs:
+                    if run.text.strip():
+                        success = translate_run_sentences(run, target_language, valid_languages)
+                        if success:
+                            stats["successful_translations"] += len(sentences)
                         else:
-                            run.font.highlight_color = WD_COLOR_INDEX.RED
-                            stats["failed_translations"] += 1
-                    except Exception as e:
-                        print(f"Error translating run: {e}")
-                        run.font.highlight_color = WD_COLOR_INDEX.RED
-                        stats["failed_translations"] += 1
+                            stats["failed_translations"] += len(sentences)
    
+    # Process tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for para in cell.paragraphs:
-                    stats["paragraphs_processed"] += 1
-                    
-                    if len(para.runs) > 1:
-                        if translate_paragraph_text(para, target_language, valid_languages):
-                            stats["successful_translations"] += 1
-                            continue
-                    
-                    for run in para.runs:
-                        if run.text.strip():
-                            stats["runs_processed"] += 1
-                            try:
-                                original_text = run.text
-                                source_lang = detect_language(original_text, valid_languages)
-                                
-                                if source_lang == target_language:
-                                    continue
-                                    
-                                translated_text = translate_text(original_text, source_lang, target_language)
-                                if translated_text and translated_text != original_text:
-                                    run.text = translated_text
-                                    stats["successful_translations"] += 1
-                                else:
-                                    run.font.highlight_color = WD_COLOR_INDEX.RED
-                                    stats["failed_translations"] += 1
-                            except Exception as e:
-                                print(f"Error translating cell run: {e}")
-                                run.font.highlight_color = WD_COLOR_INDEX.RED
-                                stats["failed_translations"] += 1
+                    if para.text.strip():
+                        stats["paragraphs_processed"] += 1
+                        
+                        # Count sentences in this cell paragraph
+                        sentences = split_into_sentences(para.text)
+                        stats["sentences_processed"] += len(sentences)
+                        
+                        if len(para.runs) > 1:
+                            success = translate_paragraph_sentences(para, target_language, valid_languages)
+                            if success:
+                                stats["successful_translations"] += len(sentences)
+                            else:
+                                stats["failed_translations"] += len(sentences)
+                        else:
+                            for run in para.runs:
+                                if run.text.strip():
+                                    success = translate_run_sentences(run, target_language, valid_languages)
+                                    if success:
+                                        stats["successful_translations"] += len(sentences)
+                                    else:
+                                        stats["failed_translations"] += len(sentences)
                                 
     return doc, stats
     
 def main():
-    st.title("Multilingual Document Translator")
-    st.write("This app detects and translates text in multiple languages within the same document.")
+    st.title("Sentence-Level Multilingual Document Translator")
+    st.write("This app translates documents at the sentence level for better translation accuracy.")
     
     uploaded_file = st.file_uploader("Upload a Word Document", type=["docx"])
     if uploaded_file:
@@ -289,21 +367,11 @@ def main():
                 
                 for p in doc.paragraphs:
                     if p.text.strip():
-                        try:
-                            detected_lang = detect_language(p.text.strip(), valid_language_codes)
-                            if detected_lang in languages_detected:
-                                languages_detected[detected_lang] += 1
-                            else:
-                                languages_detected[detected_lang] = 1
-                        except:
-                            pass
-                
-                for table in doc.tables:
-                    for row in table.rows:
-                        for cell in row.cells:
-                            if cell.text.strip():
+                        sentences = split_into_sentences(p.text)
+                        for sentence in sentences:
+                            if sentence.strip():
                                 try:
-                                    detected_lang = detect_language(cell.text.strip(), valid_language_codes)
+                                    detected_lang = detect_language(sentence.strip(), valid_language_codes)
                                     if detected_lang in languages_detected:
                                         languages_detected[detected_lang] += 1
                                     else:
@@ -311,16 +379,32 @@ def main():
                                 except:
                                     pass
                 
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            if cell.text.strip():
+                                sentences = split_into_sentences(cell.text)
+                                for sentence in sentences:
+                                    if sentence.strip():
+                                        try:
+                                            detected_lang = detect_language(sentence.strip(), valid_language_codes)
+                                            if detected_lang in languages_detected:
+                                                languages_detected[detected_lang] += 1
+                                            else:
+                                                languages_detected[detected_lang] = 1
+                                        except:
+                                            pass
+                
                 progress_bar.progress(30)
                 
                 if languages_detected:
-                    st.info("Languages detected in document:")
+                    st.info("Languages detected in document (sentence level):")
                     for lang, count in sorted(languages_detected.items(), key=lambda x: x[1], reverse=True):
-                        st.write(f"- {lang}: {count} text segments")
+                        st.write(f"- {lang}: {count} sentences")
                 else:
                     st.warning("Could not detect any language. Will use English as default source.")
             
-            status_text.text("Translating document... This may take several minutes for large documents.")
+            status_text.text("Translating document at sentence level... This may take several minutes for large documents.")
             progress_bar.progress(40)
             
             translated_doc, stats = translate_doc(doc, language_code, valid_language_codes)
@@ -328,32 +412,32 @@ def main():
             progress_bar.progress(90)
             status_text.text("Saving translated document...")
             
-            with open("translated_document.docx", "wb") as f:
+            with open("translated_document_sentences.docx", "wb") as f:
                 translated_doc.save(f)
             
             progress_bar.progress(100)
             
             if show_stats:
-                st.subheader("Translation Statistics")
-                #st.write(f"- Paragraphs processed: {stats['paragraphs_processed']}")
-                #st.write(f"- Runs processed: {stats['runs_processed']}")
-                #st.write(f"- Successful translations: {stats['successful_translations']}")
-                st.write(f"- Failed translations: {stats['failed_translations']}")
+                st.subheader("Translation Statistics (Sentence Level)")
+                st.write(f"- Sentences processed: {stats['sentences_processed']}")
+                st.write(f"- Paragraphs processed: {stats['paragraphs_processed']}")
+                st.write(f"- Successful sentence translations: {stats['successful_translations']}")
+                st.write(f"- Failed sentence translations: {stats['failed_translations']}")
                 
                 success_rate = 0
-                if stats['runs_processed'] > 0:
-                    success_rate = (stats['successful_translations'] / stats['runs_processed']) * 100
-                #st.write(f"- Success rate: {success_rate:.1f}%")
+                if stats['sentences_processed'] > 0:
+                    success_rate = (stats['successful_translations'] / stats['sentences_processed']) * 100
+                st.write(f"- Success rate: {success_rate:.1f}%")
             
-            with open("translated_document.docx", "rb") as f:
+            with open("translated_document_sentences.docx", "rb") as f:
                 st.download_button(
                     label="Download Translated Document",
                     data=f,
-                    file_name="translated_document.docx",
+                    file_name="translated_document_sentences.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
             status_text.text("")
-            st.success("Translation complete!")
+            st.success("Sentence-level translation complete!")
 
 if __name__ == '__main__':
     main()
