@@ -10,7 +10,7 @@ from docx.shared import RGBColor
 from docx.enum.text import WD_COLOR_INDEX
 import re
 
-def add_context_clues(text, source_language, target_language):
+def add_context(text, source_language, target_language):
     if source_language == source_language and target_language == target_language:
         patterns = {
             r"Reply to your notice": "Response to your notice",
@@ -30,7 +30,7 @@ def translate_text(text, source_language, target_language):
     if source_language == target_language:
         return text
     
-    contextualized_text = add_context_clues(text, source_language, target_language)
+    contextualized_text = add_context(text, source_language, target_language)
         
     api_url = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline/"
     user_id = "00fe73dcb98f43f39c1c308616856405"
