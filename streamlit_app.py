@@ -97,7 +97,7 @@ def translate_text(text, source_language, target_language):
         "inputData": {
             "input": [
                 {
-                    "source": contextualized_text
+                    "source": text
                 }
             ]
         }
