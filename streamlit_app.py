@@ -11,9 +11,7 @@ from docx.enum.text import WD_COLOR_INDEX
 import re
 
 def add_context_clues(text, source_language, target_language):
-    """Add context clues to improve translation accuracy"""
-    if source_language == "en" and target_language == "bn":
-        # Handle common patterns that get mistranslated
+    if source_language == source_language and target_language == target_language:
         patterns = {
             r"Reply to your notice": "Response to your notice",
             r"Reply to the notice": "Response to the notice", 
@@ -32,7 +30,6 @@ def translate_text(text, source_language, target_language):
     if source_language == target_language:
         return text
     
-    # Add context clues to improve translation
     contextualized_text = add_context_clues(text, source_language, target_language)
         
     api_url = "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline/"
