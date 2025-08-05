@@ -134,13 +134,30 @@ def detect_language(text, valid_languages):
     if not text or not text.strip():
         return "en"
     
+    # Clean the text for better detection
+    cleaned_text = text.strip()
+    
+    # Skip very short texts or texts with mostly non-alphabetic characters
+    if len(cleaned_text) < 3:
+        return "en"
+    
+    # Check if text has enough alphabetic characters for meaningful detection
+    alphabetic_chars = sum(c.isalpha() for c in cleaned_text)
+    if alphabetic_chars < 3:
+        return "en"
+    
     try:
-        detected = detect(text.strip())
+        detected = detect(cleaned_text)
         if detected in valid_languages:
             return detected
         return "en"
     except Exception as e:
-        print(f"Error detecting language: {e}")
+        # Handle specific langdetect errors
+        error_msg = str(e).lower()
+        if "no features in text" in error_msg:
+            print(f"Skipping text with no detectable features: '{cleaned_text[:50]}...'")
+        else:
+            print(f"Error detecting language for text '{cleaned_text[:50]}...': {e}")
         return "en"
 
 def translate_paragraph_text(paragraph, target_language, valid_languages):
